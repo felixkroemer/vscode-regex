@@ -118,10 +118,6 @@ https://marketplace.visualstudio.com/items?itemName=chrmarti.regex
 https://github.com/chrmarti/vscode-regex
 `;
 
-declare type IntervalToken = object;
-declare function setInterval(fn: () => void, delay: number): IntervalToken;
-declare function clearInterval(token: IntervalToken): void;
-
 const languages = ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'vue', 'php', 'haxe'];
 const decorators = new Map<vscode.TextEditor, RegexMatchDecorator>();
 let addGMEnabled = false;
@@ -139,9 +135,6 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => updateDecorators(findRegexEditor())));
-
-    const interval = setInterval(() => updateDecorators(), 5000);
-    context.subscriptions.push({ dispose: () => clearInterval(interval) });
 
     toggleGM.command = 'regexpreview.toggleGM';
     context.subscriptions.push(toggleGM);
