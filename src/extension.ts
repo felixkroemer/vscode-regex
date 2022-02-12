@@ -206,6 +206,10 @@ function openLoremIpsum(column: number, initialRegexMatch?: RegexMatch) {
   if (!editorURI) {
     editorURI = vscode.Uri.joinPath(vscode.Uri.file(os.tmpdir()), uuidv4());
     fs.writeFileSync(editorURI.fsPath, matchesFileContent);
+    outputChannel.appendLine(editorURI.fsPath);
+    subscriptions.push({dispose: () => {
+        fs.rm(editorURI.fsPath, () => {});
+    }})
   }
   vscode.workspace.openTextDocument(editorURI).then((document) => {
     vscode.window.showTextDocument(document, column, true).then(() => {
