@@ -3,6 +3,9 @@
  *--------------------------------------------------------*/
 
 import * as vscode from 'vscode';
+import * as os from 'os';
+import { v4 as uuidv4 } from 'uuid';
+import * as fs from 'fs';
 
 interface RegexMatch {
 
@@ -107,23 +110,15 @@ Duis aute irure dolor in reprehenderit in voluptate velit
 esse cillum dolore eu fugiat nulla pariatur. Excepteur sint
 occaecat cupidatat non proident, sunt in culpa qui officia
 deserunt mollit anim id est laborum.
-
-abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ
-0123456789 _+-.,!@#$%^&*();\/|<>"'
-12345 -98.7 3.141 .6180 9,000 +42
-555.123.4567	+1-(800)-555-2468
-foo@demo.net	bar.ba@test.co.uk
-www.demo.com	http://foo.co.uk/
-https://marketplace.visualstudio.com/items?itemName=chrmarti.regex
-https://github.com/chrmarti/vscode-regex
 `;
 
 const languages = ['javascript', 'javascriptreact', 'typescript', 'typescriptreact', 'vue', 'php', 'haxe'];
 const decorators = new Map<vscode.TextEditor, RegexMatchDecorator>();
 let addGMEnabled = false;
 const toggleGM = vscode.window.createStatusBarItem();
-let editorEnabled = false;
 let subscriptions: { dispose(): any }[];
+let editorURI : vscode.Uri;
+let outputChannel = vscode.window.createOutputChannel("regex");
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -181,34 +176,47 @@ function addGM(regex: RegExp) {
     return new RegExp(regex.source, flags);
 }
 
+function isEditorEnabled() {
+    for(let editor of getVisibleTextEditors()) {
+        if(editor.document.uri.fsPath === editorURI?.fsPath) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function toggleRegexPreview(initialRegexMatch?: RegexMatch) {
-    editorEnabled = !editorEnabled || !!initialRegexMatch && !!initialRegexMatch.regex;
-    toggleGM[editorEnabled ? 'show' : 'hide']();
-    if (editorEnabled) {
+    let enableEditor = !isEditorEnabled();
+    if (enableEditor) {
+        toggleGM['show']();
         const visibleEditors = getVisibleTextEditors();
-        if (visibleEditors.length === 1) {
-            return openLoremIpsum(visibleEditors[0].viewColumn! + 1, initialRegexMatch);
-        } else {
+        openLoremIpsum(visibleEditors[0].viewColumn! + 1, initialRegexMatch);
+    } else {
+        if (initialRegexMatch?.regex) {
             updateDecorators(findRegexEditor(), initialRegexMatch);
         }
-    } else {
-        decorators.forEach(decorator => decorator.dispose());
+        else {
+            toggleGM['hide']();
+            decorators.forEach(decorator => decorator.dispose());
+        }
     }
 }
 
 function openLoremIpsum(column: number, initialRegexMatch?: RegexMatch) {
-    return vscode.workspace.openTextDocument({ language: 'text', content: matchesFileContent })
-        .then(document => {
-            return vscode.window.showTextDocument(document, column, true);
-        }).then(editor => {
-            updateDecorators(findRegexEditor(), initialRegexMatch);
-        }).then(undefined, reason => {
-            vscode.window.showErrorMessage(reason);
-        });
+  if (!editorURI) {
+    editorURI = vscode.Uri.joinPath(vscode.Uri.file(os.tmpdir()), uuidv4());
+    fs.writeFileSync(editorURI.fsPath, matchesFileContent);
+  }
+  vscode.workspace.openTextDocument(editorURI).then((document) => {
+    vscode.window.showTextDocument(document, column, true).then(() => {
+      updateDecorators(findRegexEditor(), initialRegexMatch);
+    });
+  });
 }
 
 function updateDecorators(regexEditor?: vscode.TextEditor, initialRegexMatch?: RegexMatch) {
-    if (!editorEnabled) {
+    // TODO find out why ondidclose does not fire for editor
+    if (!isEditorEnabled()) {
         return;
     }
 
